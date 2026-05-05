@@ -53,10 +53,9 @@ export default function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps
     setInput('');
     setIsLoading(true);
 
-    // Exponential backoff for retries
     const maxRetries = 3;
     let retryCount = 0;
-    let delay = 1000; // Start with 1 second
+    let delay = 1000; 
 
     const attemptSend = async (): Promise<void> => {
       try {
@@ -75,7 +74,6 @@ export default function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps
       } catch (error: any) {
         console.error('Failed to send message:', error);
         
-        // Handle 429 with exponential backoff
         if (error.response?.status === 429 && retryCount < maxRetries) {
           retryCount++;
           const waitTime = delay * Math.pow(2, retryCount - 1);
