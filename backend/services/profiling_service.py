@@ -90,14 +90,11 @@ class PerformanceMetrics:
             "gemini_api": self.get_stats(self.gemini_times),
         }
         
-        # Add per-endpoint statistics
         for endpoint, times in self.request_times.items():
             report["endpoints"][endpoint] = self.get_stats(times)
         
-        # Identify bottlenecks
         bottlenecks = []
         
-        # Check chat endpoint SLA
         if "/api/v1/chat" in self.request_times:
             chat_stats = report["endpoints"]["/api/v1/chat"]
             if chat_stats["p95"] > 15.0:
@@ -107,7 +104,6 @@ class PerformanceMetrics:
                     "severity": "high"
                 })
         
-        # Check database performance
         if report["database"]["avg"] > 0.1:
             bottlenecks.append({
                 "component": "Database",
@@ -115,7 +111,6 @@ class PerformanceMetrics:
                 "severity": "medium"
             })
         
-        # Check Gemini API performance
         if report["gemini_api"]["avg"] > 5.0:
             bottlenecks.append({
                 "component": "Gemini API",
@@ -123,7 +118,6 @@ class PerformanceMetrics:
                 "severity": "medium"
             })
         
-        # Check memory usage
         if report["system"].get("memory_mb", 0) > 500:
             bottlenecks.append({
                 "component": "Memory",
@@ -133,7 +127,6 @@ class PerformanceMetrics:
         
         report["bottlenecks"] = bottlenecks
         
-        # Generate recommendations
         recommendations = []
         
         if bottlenecks:
@@ -154,8 +147,7 @@ class PerformanceMetrics:
         if not bottlenecks:
             recommendations.append("System is performing within acceptable parameters")
         
-        report["recommendations"] = list(set(recommendations))  # Remove duplicates
-        
+        report["recommendations"] = list(set(recommendations))  
         return report
     
     def print_report(self):
@@ -221,5 +213,4 @@ class PerformanceMetrics:
         print("\n" + "="*80)
 
 
-# Global metrics instance
 metrics = PerformanceMetrics()

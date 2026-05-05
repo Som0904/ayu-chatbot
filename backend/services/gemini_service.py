@@ -24,7 +24,6 @@ def get_response(prompt: str) -> str:
             response = model.generate_content(prompt)
             duration = time.time() - start_time
             
-            # Record metrics
             try:
                 from services.profiling_service import metrics
                 metrics.record_gemini_call(duration)

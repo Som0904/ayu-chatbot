@@ -21,21 +21,17 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.requests = defaultdict(list)
     
     async def dispatch(self, request: Request, call_next):
-        # Skip rate limiting for health checks
         if request.url.path in ["/", "/health", "/docs", "/openapi.json"]:
             return await call_next(request)
         
-        # Get client identifier (IP address or user ID from token)
         client_id = self.get_client_id(request)
         
-        # Clean old requests
         current_time = time.time()
         self.requests[client_id] = [
             req_time for req_time in self.requests[client_id]
             if current_time - req_time < self.window_size
         ]
         
-        # Check rate limit
         if len(self.requests[client_id]) >= self.requests_per_minute:
             logger.warning(f"[RATE_LIMIT] Client {client_id} exceeded rate limit")
             return JSONResponse(
@@ -44,13 +40,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
                 headers={"Retry-After": "60"},
             )
         
-        # Record this request
         self.requests[client_id].append(current_time)
         
-        # Process request
         response = await call_next(request)
         
-        # Add rate limit headers
         remaining = self.requests_per_minute - len(self.requests[client_id])
         response.headers["X-RateLimit-Limit"] = str(self.requests_per_minute)
         response.headers["X-RateLimit-Remaining"] = str(remaining)
@@ -60,7 +53,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     
     def get_client_id(self, request: Request) -> str:
         """Get client identifier from request"""
-        # Try to get user ID from token
         auth_header = request.headers.get("Authorization")
         if auth_header and auth_header.startswith("Bearer "):
             try:
@@ -73,7 +65,6 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
             except:
                 pass
         
-        # Fallback to IP address
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
             return forwarded.split(",")[0].strip()

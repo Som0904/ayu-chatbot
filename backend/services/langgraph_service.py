@@ -51,7 +51,6 @@ def extract_location_regex(text: str) -> str:
         match = re.search(pattern, text, re.IGNORECASE)
         if match:
             location = match.group(1).strip()
-            # Remove common trailing words
             location = re.sub(r'\s+(please|now|today|tomorrow)$', '', location, flags=re.IGNORECASE)
             return location.title()
     return "your area"
@@ -77,7 +76,6 @@ def tool_node(state: ChatState):
     session_id = state.get("session_id", "default")
     user_id = state.get("user_id")
     
-    # Error handling for missing user_id
     if not user_id:
         logger.error("[TOOL] Missing user_id in state")
         raise HTTPException(
@@ -91,7 +89,6 @@ def tool_node(state: ChatState):
         response = f"Here are some hospitals in {location}:\n" + "\n".join([f"- {h}" for h in hospitals])
         save_conversation(user_id, user_input, response, session_id=session_id)
         
-        # Save episodic memory for tool usage
         save_episodic_memory(
             user_id=user_id,
             session_id=session_id,
@@ -113,7 +110,6 @@ def scheduler_node(state: ChatState):
     session_id = state.get("session_id", "default")
     user_id = state.get("user_id")
     
-    # Error handling for missing user_id
     if not user_id:
         logger.error("[SCHEDULER] Missing user_id in state")
         raise HTTPException(
@@ -137,7 +133,6 @@ def scheduler_node(state: ChatState):
         response = f"I've scheduled that for you {delay_phrase}: \"{reminder_text}\""
         save_conversation(user_id, user_input, response, session_id=session_id)
         
-        # Save episodic memory for reminder
         save_episodic_memory(
             user_id=user_id,
             session_id=session_id,
@@ -159,7 +154,6 @@ def chat_node(state: ChatState):
     session_id = state.get("session_id", "default")
     user_id = state.get("user_id")
     
-    # Error handling for missing user_id
     if not user_id:
         logger.error("[CHAT] Missing user_id in state")
         raise HTTPException(
@@ -170,20 +164,16 @@ def chat_node(state: ChatState):
     if not user_input:
         return {"output": "Please enter a message."}
     
-    # Get conversation history
     history = get_history(user_id, session_id=session_id)
     
-    # Get user profile
     profile = get_user_profile(user_id)
     profile_str = "\n".join([f"- {k}: {v}" for k, v in profile.items()]) if profile else "No details known yet."
     
-    # Get episodic memories for context
     episodic_memories = get_episodic_memories(user_id, limit=5, min_importance=0.5)
     episodic_str = ""
     if episodic_memories:
         episodic_str = "\n".join([f"- {m['date']}: {m['summary']}" for m in episodic_memories])
     
-    # Build enhanced prompt with episodic memory
     prompt = f"""You are a highly capable AI assistant with long-term memory.
 --- USER CONTEXT ---
 LONG-TERM FACTS KNOWN ABOUT USER:
@@ -212,7 +202,6 @@ Assistant:"""
         response = get_response(prompt)
         clean_response = response
         
-        # Extract facts from response
         if "[EXTRACT:" in response:
             try:
                 parts = response.split("[EXTRACT:")
@@ -225,11 +214,8 @@ Assistant:"""
             except Exception as e:
                 logger.error(f"[PROFILE] Extraction failed: {e}")
         
-        # Save conversation
         save_conversation(user_id, user_input, clean_response, session_id=session_id)
         
-        # Save episodic memory for significant conversations
-        # Determine importance based on conversation length and content
         importance = 0.5
         if len(user_input) > 100 or any(word in user_input.lower() for word in ['important', 'remember', 'never forget']):
             importance = 0.8
@@ -257,31 +243,24 @@ def route_decision(state: ChatState) -> str:
     """Decide which node to route to based on user input"""
     user_input = state.get("input", "").lower()
     
-    # Check for hospital search
     if any(word in user_input for word in ["hospital", "clinic", "medical center", "doctor"]):
         return "tool"
     
-    # Check for reminder/scheduler
     if any(phrase in user_input for phrase in ["remind me", "reminder", "don't forget", "set a reminder"]):
         return "scheduler"
     
-    # Default to chat
     return "chat"
 
 
-# Build the LangGraph
 graph = StateGraph(ChatState)
 
-# Add nodes
 graph.add_node("router", router_node)
 graph.add_node("chat", chat_node)
 graph.add_node("tool", tool_node)
 graph.add_node("scheduler", scheduler_node)
 
-# Set entry point
 graph.set_entry_point("router")
 
-# Add conditional edges from router
 graph.add_conditional_edges(
     "router",
     route_decision,
@@ -292,12 +271,10 @@ graph.add_conditional_edges(
     }
 )
 
-# Add edges to END
 graph.add_edge("chat", END)
 graph.add_edge("tool", END)
 graph.add_edge("scheduler", END)
 
-# Compile the graph
 app_graph = graph.compile()
 
 logger.info("[LANGGRAPH] Graph compiled successfully with episodic memory integration")

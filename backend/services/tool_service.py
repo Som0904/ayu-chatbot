@@ -12,7 +12,6 @@ def find_hospitals(location: str) -> list[str]:
             "format": "json",
             "limit": 5
         }
-        # Nominatim requires a User-Agent header
         headers = {"User-Agent": "gemini-langgraph-chatbot/1.0"}
 
         res = requests.get(url, params=params, headers=headers, timeout=5)

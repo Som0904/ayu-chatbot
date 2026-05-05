@@ -32,7 +32,6 @@ def get_user_profile(user_id: str) -> dict:
 
 def update_user_profile(user_id: str, key: str, value: str):
     """Legacy wrapper for compatibility"""
-    # Maintain age validation if needed
     if key == "age":
         try:
             age = int(value)

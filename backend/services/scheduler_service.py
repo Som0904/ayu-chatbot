@@ -30,11 +30,9 @@ def send_notification(user_id: str, message: str):
             "created_at": datetime.now(timezone.utc)
         }
         
-        # Save notification
         res = notifications_col.insert_one(notif)
         notif_id = res.inserted_id
         
-        # Find user for email
         user = users_col.find_one({"id": user_id})
         if user and user.get("email"):
             email_sent = send_notification_email(user["email"], user["username"], message)

@@ -19,7 +19,6 @@ def save_conversation(user_id: str, user_input: str, bot_response: str, session_
         conversations_col.insert_one(convo)
         duration = time.time() - start
         
-        # Record metrics
         try:
             from services.profiling_service import metrics
             metrics.record_db_operation(duration)
@@ -56,12 +55,10 @@ def get_history(user_id: str, session_id: str = "default", limit: int = None) ->
 
 def get_all_sessions(user_id: str):
     try:
-        # Get unique session IDs for the user
         session_ids = conversations_col.distinct("session_id", {"user_id": user_id})
         
         result = []
         for sid in session_ids:
-            # Find first and last messages to get metadata
             first_convo = conversations_col.find_one(
                 {"user_id": user_id, "session_id": sid}, 
                 sort=[("created_at", 1)]
@@ -77,7 +74,6 @@ def get_all_sessions(user_id: str):
                 "first_message": first_convo["user_input"] if first_convo else None
             })
             
-        # Sort by last active descending
         return sorted(result, key=lambda x: x["last_active"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
     except Exception as e:
         logger.error(f"[MEMORY] Failed to get sessions for user {user_id}: {e}")
