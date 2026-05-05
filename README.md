@@ -2,7 +2,8 @@
 
 > A conversational AI assistant with persistent memory, session management, and real-time tools — built with Google Gemini, LangGraph, FastAPI, and React.
 
-🌐 **Live Demo:** Coming Soon
+🌐 **Live Demo:** [https://ayu-chatbot-khaki.vercel.app](https://ayu-chatbot-khaki.vercel.app)
+⚙️ **API Endpoint:** [https://ayu-chatbot.onrender.com](https://ayu-chatbot.onrender.com)
 
 📊 **Performance Report:** See below for detailed metrics
 
@@ -260,7 +261,8 @@ The app will open at `http://localhost:3000`.
 
 ## Deployment
 
-🌐 **Live URL:** Coming Soon
+🌐 **Live URL:** [https://ayu-chatbot-khaki.vercel.app](https://ayu-chatbot-khaki.vercel.app)
+⚙️ **API Endpoint:** [https://ayu-chatbot.onrender.com](https://ayu-chatbot.onrender.com)
 
 ### Deploy Backend (e.g., Render / Railway)
 - Set `GEMINI_API_KEY`, `MONGO_URL`, and `JWT_SECRET_KEY` as environment variables in your platform dashboard.
