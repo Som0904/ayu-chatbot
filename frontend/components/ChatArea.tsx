@@ -153,7 +153,7 @@ export default function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
             <div className="text-center space-y-4">
-              <h2 className="text-2xl font-bold text-foreground">Welcome to Gemini Chat</h2>
+              <h2 className="text-2xl font-bold text-foreground">Welcome to Ayu ChatBot</h2>
               <p className="text-muted-foreground">Start a conversation by typing a message below</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 max-w-2xl">
                 {suggestions.map((suggestion) => (
