@@ -1,6 +1,5 @@
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.jobstores.mongodb import MongoDBJobStore
-import time
 import logging
 from datetime import datetime, timezone, timedelta
 import re
@@ -83,7 +82,7 @@ def parse_reminder_delay(user_input: str):
             seconds = int(match.group(1)) * multiplier
             return max(5, seconds), f"in {match.group(1)} {unit}"
 
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     time_part = _extract_clock_time(text)
 
     if "tomorrow" in text:
@@ -103,8 +102,7 @@ def parse_reminder_delay(user_input: str):
 
 
 def schedule_task(user_id: str, message: str, delay: int = 600):
-    run_time = time.time() + delay
-    run_date = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(run_time))
+    run_date = datetime.now(timezone.utc) + timedelta(seconds=delay)
     job_id = f"reminder_{user_id}_{uuid.uuid4().hex[:12]}"
 
     scheduler.add_job(

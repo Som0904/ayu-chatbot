@@ -21,12 +21,21 @@ def sanitize_input(text: str) -> str:
 class ChatRequest(BaseModel):
     user_input: str
     session_id: str = "default"
+    api_key: str | None = None
 
     @field_validator("user_input")
     @classmethod
     def must_not_be_empty(cls, v: str) -> str:
         if not v.strip(): raise ValueError("user_input cannot be empty")
         return v.strip()
+
+    @field_validator("api_key")
+    @classmethod
+    def sanitize_api_key(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        cleaned = v.strip()
+        return cleaned or None
 
 
 class ProfileUpdateRequest(BaseModel):
@@ -58,7 +67,8 @@ async def chat(request: ChatRequest, current_user: dict = Depends(get_current_us
         result = app_graph.invoke({
             "input": sanitized_input,
             "session_id": request.session_id,
-            "user_id": current_user["id"]
+            "user_id": current_user["id"],
+            "api_key": request.api_key
         })
         output = result.get("output") if result else None
         if not output:

@@ -55,26 +55,27 @@ def get_history(user_id: str, session_id: str = "default", limit: int = None) ->
 
 def get_all_sessions(user_id: str):
     try:
-        session_ids = conversations_col.distinct("session_id", {"user_id": user_id})
-        
-        result = []
-        for sid in session_ids:
-            first_convo = conversations_col.find_one(
-                {"user_id": user_id, "session_id": sid}, 
-                sort=[("created_at", 1)]
-            )
-            last_convo = conversations_col.find_one(
-                {"user_id": user_id, "session_id": sid}, 
-                sort=[("created_at", -1)]
-            )
-            
-            result.append({
-                "id": sid,
-                "last_active": last_convo["created_at"] if last_convo else None,
-                "first_message": first_convo["user_input"] if first_convo else None
-            })
-            
-        return sorted(result, key=lambda x: x["last_active"] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+        pipeline = [
+            {"$match": {"user_id": user_id}},
+            {"$sort": {"created_at": 1}},
+            {
+                "$group": {
+                    "_id": "$session_id",
+                    "first_message": {"$first": "$user_input"},
+                    "last_active": {"$last": "$created_at"},
+                }
+            },
+            {"$sort": {"last_active": -1}},
+        ]
+        docs = list(conversations_col.aggregate(pipeline))
+        return [
+            {
+                "id": d["_id"],
+                "last_active": d.get("last_active"),
+                "first_message": d.get("first_message"),
+            }
+            for d in docs
+        ]
     except Exception as e:
         logger.error(f"[MEMORY] Failed to get sessions for user {user_id}: {e}")
         return []

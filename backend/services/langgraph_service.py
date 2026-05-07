@@ -4,7 +4,12 @@ import re
 from typing import TypedDict
 from fastapi import HTTPException, status
 from langgraph.graph import StateGraph, END
-from services.gemini_service import get_response
+from services.gemini_service import (
+    get_response,
+    GeminiAuthError,
+    GeminiRateLimitError,
+    GeminiServiceError,
+)
 from services.tool_service import find_hospitals
 from services.scheduler_service import schedule_task, parse_reminder_delay
 from services.memory_service import get_history, save_conversation
@@ -18,9 +23,10 @@ class ChatState(TypedDict, total=False):
     output: str
     session_id: str
     user_id: str
+    api_key: str
 
 
-def extract_location_with_gemini(text: str) -> str:
+def extract_location_with_gemini(text: str, api_key: str | None = None) -> str:
     """Extract location from user input using Gemini for better accuracy"""
     try:
         prompt = f"""Extract the location name from this text. Return ONLY the location name, nothing else.
@@ -29,14 +35,21 @@ If no location is mentioned, return "unknown".
 Text: {text}
 
 Location:"""
-        location = get_response(prompt).strip()
+        location = get_response(prompt, api_key=api_key).strip()
         if location.startswith("Error:"):
             raise ValueError(f"Gemini returned an error: {location}")
         if location.lower() in ["unknown", "none", ""]:
             return "your area"
         return location.title()
-    except Exception as e:
+    except GeminiAuthError:
+        raise
+    except GeminiRateLimitError:
+        raise
+    except GeminiServiceError as e:
         logger.error(f"[LOCATION] Gemini extraction failed: {e}")
+        return extract_location_regex(text)
+    except Exception as e:
+        logger.error(f"[LOCATION] Unexpected extraction failure: {e}")
         return extract_location_regex(text)
 
 def extract_location_regex(text: str) -> str:
@@ -75,6 +88,7 @@ def tool_node(state: ChatState):
     user_input = state.get("input", "")
     session_id = state.get("session_id", "default")
     user_id = state.get("user_id")
+    api_key = state.get("api_key")
     
     if not user_id:
         logger.error("[TOOL] Missing user_id in state")
@@ -84,7 +98,7 @@ def tool_node(state: ChatState):
         )
     
     try:
-        location = extract_location_with_gemini(user_input)
+        location = extract_location_with_gemini(user_input, api_key=api_key)
         hospitals = find_hospitals(location)
         response = f"Here are some hospitals in {location}:\n" + "\n".join([f"- {h}" for h in hospitals])
         save_conversation(user_id, user_input, response, session_id=session_id)
@@ -97,6 +111,23 @@ def tool_node(state: ChatState):
             importance_score=0.6
         )
         
+        return {"output": response}
+    except GeminiAuthError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired Gemini API key. Update it in API Key settings or disconnect to use backend default key.",
+        )
+    except GeminiRateLimitError:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Gemini is rate-limited right now. Please try again in a moment.",
+        )
+    except GeminiServiceError:
+        # Tool flow can safely degrade to regex fallback if Gemini is unavailable.
+        location = extract_location_regex(user_input)
+        hospitals = find_hospitals(location)
+        response = f"Here are some hospitals in {location}:\n" + "\n".join([f"- {h}" for h in hospitals])
+        save_conversation(user_id, user_input, response, session_id=session_id)
         return {"output": response}
     except HTTPException:
         raise
@@ -153,6 +184,7 @@ def chat_node(state: ChatState):
     user_input = state.get("input", "").strip()
     session_id = state.get("session_id", "default")
     user_id = state.get("user_id")
+    api_key = state.get("api_key")
     
     if not user_id:
         logger.error("[CHAT] Missing user_id in state")
@@ -199,7 +231,7 @@ SYSTEM INSTRUCTIONS:
 Assistant:"""
     
     try:
-        response = get_response(prompt)
+        response = get_response(prompt, api_key=api_key)
         clean_response = response
         
         if "[EXTRACT:" in response:
@@ -229,6 +261,21 @@ Assistant:"""
         )
         
         return {"output": clean_response}
+    except GeminiAuthError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired Gemini API key. Update it in API Key settings or disconnect to use backend default key.",
+        )
+    except GeminiRateLimitError:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Gemini is rate-limited right now. Please try again in a moment.",
+        )
+    except GeminiServiceError:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Gemini service is unavailable. Please try again.",
+        )
     except Exception as e:
         logger.error(f"[CHAT] Failed to generate response: {e}")
         return {"output": "I'm having trouble generating a response right now. Please try again."}

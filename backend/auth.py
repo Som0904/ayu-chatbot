@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Any
+from typing import Optional
 import jwt
 import bcrypt
 from fastapi import Depends, HTTPException, status
@@ -58,12 +58,8 @@ def get_current_user(
             detail="Invalid authentication credentials"
         )
     
-    # In MongoDB we use the string ID (which might be the original integer ID or ObjectId)
-    # The original project used integers. If we are migrating, we might have integer IDs stored as strings in JWT.
-    try:
-        user = users_col.find_one({"id": int(user_id)})
-    except ValueError:
-        user = users_col.find_one({"id": user_id})
+    # MongoDB user IDs are normalized as strings.
+    user = users_col.find_one({"id": str(user_id)})
     
     if user is None:
         raise HTTPException(
