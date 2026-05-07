@@ -40,7 +40,7 @@ export const authAPI = {
 };
 
 export const chatAPI = {
-  sendMessage: (data: { user_input: string; session_id: string }) =>
+  sendMessage: (data: { user_input: string; session_id: string; api_key?: string }) =>
     api.post('/api/v1/chat', data),
   getSessions: () => api.get('/api/v1/sessions'),
   getSessionHistory: (sessionId: string) =>

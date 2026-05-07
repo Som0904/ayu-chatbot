@@ -35,6 +35,7 @@ interface Store {
   notifications: Notification[];
   profile: Record<string, any>;
   isLoading: boolean;
+  customApiKey: string;
   
   setUser: (user: User | null) => void;
   setToken: (token: string | null) => void;
@@ -45,6 +46,8 @@ interface Store {
   setNotifications: (notifications: Notification[]) => void;
   setProfile: (profile: Record<string, any>) => void;
   setIsLoading: (loading: boolean) => void;
+  setCustomApiKey: (key: string) => void;
+  clearCustomApiKey: () => void;
   logout: () => void;
 }
 
@@ -57,6 +60,7 @@ export const useStore = create<Store>((set) => ({
   notifications: [],
   profile: {},
   isLoading: false,
+  customApiKey: '',
 
   setUser: (user) => set({ user }),
   setToken: (token) => set({ token }),
@@ -67,9 +71,18 @@ export const useStore = create<Store>((set) => ({
   setNotifications: (notifications) => set({ notifications }),
   setProfile: (profile) => set({ profile }),
   setIsLoading: (loading) => set({ isLoading: loading }),
+  setCustomApiKey: (key) => {
+    localStorage.setItem('customGeminiApiKey', key);
+    set({ customApiKey: key });
+  },
+  clearCustomApiKey: () => {
+    localStorage.removeItem('customGeminiApiKey');
+    set({ customApiKey: '' });
+  },
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    set({ user: null, token: null, sessions: [], messages: [], notifications: [], profile: {} });
+    localStorage.removeItem('customGeminiApiKey');
+    set({ user: null, token: null, sessions: [], messages: [], notifications: [], profile: {}, customApiKey: '' });
   },
 }));

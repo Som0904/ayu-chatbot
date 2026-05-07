@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useStore } from '@/lib/store';
 import { chatAPI } from '@/lib/api';
-import { Send, Menu } from 'lucide-react';
+import { Send, Menu, Settings, Eye, EyeOff } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -13,8 +13,12 @@ interface ChatAreaProps {
 }
 
 export default function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps) {
-  const { messages, currentSessionId, addMessage, setIsLoading, isLoading } = useStore();
+  const { messages, currentSessionId, addMessage, setIsLoading, isLoading, customApiKey, setCustomApiKey, clearCustomApiKey } = useStore();
   const [input, setInput] = useState('');
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [showApiKeyValue, setShowApiKeyValue] = useState(false);
+  const [draftApiKey, setDraftApiKey] = useState('');
+  const [apiKeyError, setApiKeyError] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const suggestions = [
@@ -37,6 +41,14 @@ export default function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps
       textareaRef.current.style.height = textareaRef.current.scrollHeight + 'px';
     }
   }, [input]);
+
+  useEffect(() => {
+    const savedKey = localStorage.getItem('customGeminiApiKey');
+    if (savedKey) {
+      setCustomApiKey(savedKey);
+      setDraftApiKey(savedKey);
+    }
+  }, [setCustomApiKey]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +74,7 @@ export default function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps
         const response = await chatAPI.sendMessage({
           user_input: userInput,
           session_id: currentSessionId,
+          ...(customApiKey ? { api_key: customApiKey } : {}),
         });
 
         const botMessage = {
@@ -134,18 +147,56 @@ export default function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps
     textareaRef.current?.focus();
   };
 
+  const handleConnectApiKey = () => {
+    const trimmed = draftApiKey.trim();
+    if (!trimmed) return;
+    if (!/^AIza[0-9A-Za-z\-_]{20,}$/.test(trimmed)) {
+      setApiKeyError('Invalid Gemini API key format.');
+      return;
+    }
+    setApiKeyError('');
+    setCustomApiKey(trimmed);
+    setShowApiKeyModal(false);
+  };
+
+  const handleDisconnectApiKey = () => {
+    clearCustomApiKey();
+    setDraftApiKey('');
+    setShowApiKeyValue(false);
+    setApiKeyError('');
+  };
+
+  const handleOpenApiKeyModal = () => {
+    setDraftApiKey(customApiKey);
+    setApiKeyError('');
+    setShowApiKeyModal(true);
+  };
+
   return (
     <div className="flex-1 flex flex-col h-screen">
-      {!sidebarOpen && (
-        <div className="p-4 border-b border-border">
+      <div className="p-4 border-b border-border flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          {!sidebarOpen && (
           <button
             onClick={onToggleSidebar}
             className="p-2 hover:bg-accent rounded-md"
           >
             <Menu className="w-5 h-5" />
           </button>
+          )}
+          <span className={`text-xs px-2 py-1 rounded-full border ${customApiKey ? 'border-emerald-500/40 text-emerald-600' : 'border-border text-muted-foreground'}`}>
+            {customApiKey ? 'Connected: Custom key' : 'Using default backend key'}
+          </span>
         </div>
-      )}
+        <button
+          type="button"
+          onClick={handleOpenApiKeyModal}
+          className="inline-flex items-center gap-2 px-3 py-2 text-sm border border-input rounded-md hover:bg-accent"
+        >
+          <Settings className="w-4 h-4" />
+          API Key
+        </button>
+      </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
@@ -226,6 +277,65 @@ export default function ChatArea({ sidebarOpen, onToggleSidebar }: ChatAreaProps
           </button>
         </form>
       </div>
+
+      {showApiKeyModal && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-background border border-border rounded-lg p-4 space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-foreground">Gemini API Key</h3>
+              <p className="text-sm text-muted-foreground">Paste Gemini API Key</p>
+            </div>
+
+            <div className="relative">
+              <input
+                type={showApiKeyValue ? 'text' : 'password'}
+                value={draftApiKey}
+                onChange={(e) => {
+                  setDraftApiKey(e.target.value);
+                  if (apiKeyError) setApiKeyError('');
+                }}
+                placeholder="AIza..."
+                className="w-full pr-10 px-3 py-2 bg-background border border-input rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKeyValue((v) => !v)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+              >
+                {showApiKeyValue ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+            {apiKeyError && <p className="text-sm text-destructive">{apiKeyError}</p>}
+
+            <div className="flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={handleDisconnectApiKey}
+                className="px-3 py-2 text-sm border border-input rounded-md hover:bg-accent"
+              >
+                Disconnect / Reset
+              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowApiKeyModal(false)}
+                  className="px-3 py-2 text-sm border border-input rounded-md hover:bg-accent"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConnectApiKey}
+                  disabled={!draftApiKey.trim()}
+                  className="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+                >
+                  Connect / Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
